@@ -8,7 +8,7 @@ use warnings;
 use Moose;
 use Net::GitHub;
 use Term::ReadLine;
-use Data::Dumper;
+use JSON::XS;
 
 has 'term' => (
     is  => 'ro',
@@ -55,11 +55,28 @@ my $dispatch = {
     'quit'  => sub { exit; },
     '?'     => \&help,
     'h'     => \&help,
-    
-    # Repo
+
+    # Common
     repo    => \&set_repo,
     login   => \&set_login,
-    show    => sub { shift->run_github( 'repos->show()' ); },
+    
+    # Repo
+    show    => sub {
+        my ( $self, $args ) = @_;
+        if ( $args and $args =~ /^([\-\w]+)[\/\\]([\-\w]+)$/ ) {
+            $self->run_github("repos->show('$1', '$2')");
+        } else {
+            $self->run_github('repos->show()');
+        }
+    },
+    list    => sub {
+        my ( $self, $args ) = @_;
+        if ( $args and $args =~ /^[\w\-]+$/ ) {
+            $self->run_github("repos->list('$args')");
+        } else {
+            $self->run_github('repos->list()');
+        }
+    },
     
     watch   => sub { shift->run_github( 'repos->watch()' ); },
     unwatch => sub { shift->run_github( 'repos->unwatch()' ); },
@@ -83,6 +100,7 @@ START
     while ( defined (my $command = $self->term->readline($self->prompt)) ) {
 
         $command =~ s/(^\s+|\s+$)//g;
+        next unless length($command);
 
         # check dispatch
         if ( exists $dispatch->{$command} ) {
@@ -105,10 +123,18 @@ START
 sub help {
     print <<HELP;
  command  argument          description
- 
- repo     WORD              set owner/repo like 'fayland/perl-app-github'
- show                       more in-depth information for a repository
+ repo     :user/:repo       set owner/repo
+                            eg: 'fayland/perl-app-github'
+ login    :login :token     authenticated as :login
  ?,h                        help
+
+Repos
+ show     ?:user/:repo      more in-depth information for a repository
+                            (default by repo command)
+ list     ?:user            list out all the repositories for a user
+                            (default by repo command)
+ watch                      watch repositories (authentication required)
+ unwatch                    unwatch repositories (authentication required)
 
 File/Path related
  cd       PATH              chdir to PATH
@@ -171,7 +197,7 @@ ERR
         return;
     }
     
-    eval("print Dumper(\\\$self->github->$command)");
+    eval(qq~print JSON::XS->new->utf8->pretty->encode(\$self->github->$command) . "\n"~);
     
     if ( $@ ) {
         # custom error
