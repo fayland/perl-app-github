@@ -12,24 +12,33 @@ use JSON::XS;
 
 our $VERSION = '0.03';
 
+# Copied from Devel-REPL
 has 'term' => (
-    is  => 'ro',
-    isa => 'Object',
-    default => sub {
-        my $term = new Term::ReadLine 'github';
-    
-        my $odef = select STDERR;
-        $| = 1;
-        select STDOUT;
-        $| = 1;
-        select $odef;
-        
-        return $term;
-    }
+  is => 'rw', required => 1,
+  default => sub { Term::ReadLine->new('Perl-App-GitHub') }
 );
 has 'prompt' => (
-    is => 'rw', isa => 'Str', default => "github> ",
+  is => 'rw', required => 1,
+  default => sub { 'github> ' }
 );
+
+has 'out_fh' => (
+  is => 'rw', required => 1, lazy => 1,
+  default => sub { shift->term->OUT || \*STDOUT; }
+);
+
+sub print {
+    my ($self, @ret) = @_;
+    my $fh = $self->out_fh;
+    no warnings 'uninitialized';
+    print $fh "@ret";
+    print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
+}
+sub read {
+    my ($self, $prompt) = @_;
+    $prompt ||= $self->prompt;
+    return $self->term->readline($prompt);
+}
 
 has 'github' => (
     is  => 'rw',
@@ -111,21 +120,22 @@ my $dispatch = {
     
     # File/Path
     cd      => sub {
-        eval("chdir " . shift);
-        print $@ if $@;
+        my ( $self, $args ) = @_;
+        eval("chdir $args");
+        $self->print($@) if $@;
     },
 };
 
 sub run {
     my $self = shift;
 
-    print <<START;
+    $self->print(<<START);
 
 Welcome to GitHub Command Tools! (Ver: $VERSION)
 Type '?' or 'h' for help.
 START
 
-    while ( defined (my $command = $self->term->readline($self->prompt)) ) {
+    while ( defined (my $command = $self->read) ) {
 
         $command =~ s/(^\s+|\s+$)//g;
         next unless length($command);
@@ -139,7 +149,7 @@ START
             if ( $command and exists $dispatch->{$command} ) {
                 $dispatch->{$command}->( $self, $args );
             } else {
-                print "Unknown command, type '?' or 'h' for help\n";
+                $self->print("Unknown command, type '?' or 'h' for help");
                 next unless $command;
             }
         }
@@ -149,12 +159,13 @@ START
 }
 
 sub help {
-    print <<HELP;
+    my $self = shift;
+    $self->print(<<HELP);
  command  argument          description
  repo     :user :repo       set owner/repo, eg: 'fayland perl-app-github'
  login    :login :token     authenticated as :login
  ?,h                        help
- q,exit,quit                  exit
+ q,exit,quit                exit
 
 Repos
  rshow                      more in-depth information for the :repo in repo
@@ -192,7 +203,7 @@ sub set_repo {
     
     # validate
     unless ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
-        print "Wrong repo args ($repo), eg fayland/perl-app-github\n";
+        $self->print("Wrong repo args ($repo), eg fayland/perl-app-github");
         return;
     }
     my ( $owner, $name ) = ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ );
@@ -216,7 +227,7 @@ sub set_login {
     
     ( $login, my $token ) = split(/\s+/, $login, 2);
     unless ( $login and $token ) {
-        print "Wrong login args ($login $token), eg fayland 54b5197d7f92f52abc5c7149b313cf51\n";
+        $self->print("Wrong login args ($login $token), eg fayland 54b5197d7f92f52abc5c7149b313cf51");
         return;
     }
     
@@ -236,22 +247,22 @@ sub run_github {
     my ( $self, $command ) = @_;
     
     unless ( $self->github ) {
-        print <<'ERR';
+        $self->print(<<'ERR');
 unknown repo. try 'repo :owner/:repo' first
 ERR
         return;
     }
     
-    eval(qq~print JSON::XS->new->utf8->pretty->encode(\$self->github->$command) . "\n"~);
+    eval(qq~\$self->print(JSON::XS->new->utf8->pretty->encode(\$self->github->$command))~);
     
     if ( $@ ) {
         # custom error
         if ( $@ =~ /login and token are required/ ) {
-            print <<'ERR';
+            $self->print(<<'ERR');
 authentication required. try 'login :owner :token' first
 ERR
         } else {
-            print $@;
+            $self->print($@);
         }
     }
 }
@@ -280,11 +291,11 @@ sub repo_create {
     
     my %data;
     foreach my $col ( 'name', 'desc', 'homepage' ) {
-        my $data = $self->term->readline( ucfirst($col) . ': ' );
+        my $data = $self->read( ucfirst($col) . ': ' );
         $data{$col} = $data;
     }
     unless ( length( $data{name} ) ) {
-        print <<'ERR';
+        $self->print(<<'ERR');
 create repo failed. name is required
 ERR
         return;
@@ -296,9 +307,9 @@ ERR
 sub repo_del {
     my ( $self ) = @_;
     
-    my $data = $self->term->readline( 'Are you sure to delete the repo? [YN]? ' );
+    my $data = $self->read( 'Are you sure to delete the repo? [YN]? ' );
     if ( $data eq 'Y' ) {
-        print "Deleting Repos ...\n";
+        $self->print("Deleting Repos ...");
         $self->run_github( "repos->delete( { confirm => 1 } )" );
     }
 }
@@ -309,7 +320,7 @@ sub issue_open {
     
     my %data;
     foreach my $col ( 'title', 'body' ) {
-        my $data = $self->term->readline( ucfirst($col) . ': ' );
+        my $data = $self->read( ucfirst($col) . ': ' );
         $data{$col} = $data;
     }
 
