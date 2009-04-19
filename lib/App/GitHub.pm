@@ -61,6 +61,7 @@ L<Net::GitHub>
 my $dispatch = {
     'exit'  => sub { exit; },
     'quit'  => sub { exit; },
+    'q'     => sub { exit; },
     '?'     => \&help,
     'h'     => \&help,
 
@@ -69,10 +70,44 @@ my $dispatch = {
     login   => \&set_login,
     
     # Repo
-    show    => \&repo_show,
-    list    => \&repo_list,
-    watch   => sub { shift->run_github( 'repos->watch()' ); },
-    unwatch => sub { shift->run_github( 'repos->unwatch()' ); },
+    rshow    => \&repo_show,
+    rlist    => \&repo_list,
+    findrepo => sub {
+        my ( $self, $word ) = @_;
+        $self->run_github( "repos->search('$word')" );
+    },
+    watch    => sub { shift->run_github( 'repos->watch()' ); },
+    unwatch  => sub { shift->run_github( 'repos->unwatch()' ); },
+    fork     => sub { shift->run_github( 'repos->fork()' ); },
+    create   => \&repo_create,
+    delete   => \&repo_delete,
+    set_private => sub { shift->run_github( 'repos->set_private()' ); },
+    set_public  => sub { shift->run_github( 'repos->set_public()' ); },
+    # XXX? TODO, deploy_keys collaborators
+    network     => sub { shift->run_github( 'repos->network()' ); },
+    tags        => sub { shift->run_github( 'repos->tags()' ); },
+    branches    => sub { shift->run_github( 'repos->branches()' ); },
+    
+    # Issues
+    ilist    => sub {
+        my ( $self, $type ) = @_;
+        $type ||= 'open';
+        $self->run_github( "issue->list('$type')" );
+    },
+    iview    => sub {
+        my ( $self, $number ) = @_;
+        $self->run_github( "issue->view($number)" ); 
+    },
+    iopen    => \&issue_open,
+    iclose   => sub {
+        my ( $self, $number ) = @_;
+        $self->run_github( "issue->close($number)" ); 
+    },
+    ireopen  => sub {
+        my ( $self, $number ) = @_;
+        $self->run_github( "issue->reopen($number)" ); 
+    },
+    # XXX? TODO, add_label, edit etc
     
     # File/Path
     cd      => sub {
@@ -119,13 +154,29 @@ sub help {
  repo     :user :repo       set owner/repo, eg: 'fayland perl-app-github'
  login    :login :token     authenticated as :login
  ?,h                        help
- exit,quit                  exit
+ q,exit,quit                  exit
 
 Repos
- show                       more in-depth information for the :repo in repo
- list                       list out all the repositories for the :user in repo
+ rshow                      more in-depth information for the :repo in repo
+ rlist                      list out all the repositories for the :user in repo
+ rsearch  WORD              Search Repositories
  watch                      watch repositories (authentication required)
  unwatch                    unwatch repositories (authentication required)
+ fork                       fork a repository (authentication required)
+ create                     create a new repository (authentication required)
+ delete                     delete a repository (authentication required)
+ set_private                set a public repo private (authentication required)
+ set_public                 set a private repo public (authentication required)
+ network                    see all the forks of the repo
+ tags                       tags on the repo
+ branches                   list of remote branches
+
+Issues
+ ilist    open|closed       see a list of issues for a project
+ iview    :number           get data on an individual issue by number
+ iopen                      open a new issue (authentication required)
+ iclose   :number           close an issue (authentication required)
+ ireopen  :number           reopen an issue (authentication required)
 
 File/Path related
  cd       PATH              chdir to PATH
@@ -222,6 +273,47 @@ sub repo_list {
     } else {
         $self->run_github('repos->list()');
     }
+}
+
+sub repo_create {
+    my ( $self ) = @_;
+    
+    my %data;
+    foreach my $col ( 'name', 'desc', 'homepage' ) {
+        my $data = $self->term->readline( ucfirst($col) . ': ' );
+        $data{$col} = $data;
+    }
+    unless ( length( $data{name} ) ) {
+        print <<'ERR';
+create repo failed. name is required
+ERR
+        return;
+    }
+    
+    $self->run_github( qq~repos->create( "$data{name}", "$data{desc}", "$data{homepage}", 1 )~ );
+}
+
+sub repo_del {
+    my ( $self ) = @_;
+    
+    my $data = $self->term->readline( 'Are you sure to delete the repo? [YN]? ' );
+    if ( $data eq 'Y' ) {
+        print "Deleting Repos ...\n";
+        $self->run_github( "repos->delete( { confirm => 1 } )" );
+    }
+}
+
+# Issues
+sub issue_open {
+    my ( $self ) = @_;
+    
+    my %data;
+    foreach my $col ( 'title', 'body' ) {
+        my $data = $self->term->readline( ucfirst($col) . ': ' );
+        $data{$col} = $data;
+    }
+
+    $self->run_github( qq~issue->open( "$data{title}", "$data{body}" )~ );
 }
 
 1;
