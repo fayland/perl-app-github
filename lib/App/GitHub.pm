@@ -69,23 +69,8 @@ my $dispatch = {
     login   => \&set_login,
     
     # Repo
-    show    => sub {
-        my ( $self, $args ) = @_;
-        if ( $args and $args =~ /^([\-\w]+)[\/\\]([\-\w]+)$/ ) {
-            $self->run_github("repos->show('$1', '$2')");
-        } else {
-            $self->run_github('repos->show()');
-        }
-    },
-    list    => sub {
-        my ( $self, $args ) = @_;
-        if ( $args and $args =~ /^[\w\-]+$/ ) {
-            $self->run_github("repos->list('$args')");
-        } else {
-            $self->run_github('repos->list()');
-        }
-    },
-    
+    show    => \&repo_show,
+    list    => \&repo_list,
     watch   => sub { shift->run_github( 'repos->watch()' ); },
     unwatch => sub { shift->run_github( 'repos->unwatch()' ); },
     
@@ -131,22 +116,23 @@ START
 sub help {
     print <<HELP;
  command  argument          description
- repo     :user/:repo       set owner/repo
-                            eg: 'fayland/perl-app-github'
+ repo     :user :repo       set owner/repo, eg: 'fayland perl-app-github'
  login    :login :token     authenticated as :login
  ?,h                        help
+ exit,quit                  exit
 
 Repos
- show     ?:user/:repo      more in-depth information for a repository
-                            (default by repo command)
- list     ?:user            list out all the repositories for a user
-                            (default by repo command)
+ show                       more in-depth information for the :repo in repo
+ list                       list out all the repositories for the :user in repo
  watch                      watch repositories (authentication required)
  unwatch                    unwatch repositories (authentication required)
 
 File/Path related
  cd       PATH              chdir to PATH
 
+Others
+ show     :user :repo       more in-depth information for a repository
+ list     :user             list out all the repositories for a user
 HELP
 }
 
@@ -154,11 +140,11 @@ sub set_repo {
     my ( $self, $repo ) = @_;
     
     # validate
-    unless ( $repo =~ /^([\-\w]+)[\/\\]([\-\w]+)$/ ) {
+    unless ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
         print "Wrong repo args ($repo), eg fayland/perl-app-github\n";
         return;
     }
-    my ( $owner, $name ) = ( $repo =~ /^([\-\w]+)[\/\\]([\-\w]+)$/ );
+    my ( $owner, $name ) = ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ );
     $self->{_data}->{owner} = $owner;
     $self->{_data}->{repo} = $name;
     
@@ -216,6 +202,25 @@ ERR
         } else {
             print $@;
         }
+    }
+}
+
+################## Repos
+sub repo_show {
+    my ( $self, $args ) = @_;
+    if ( $args and $args =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
+        $self->run_github("repos->show('$1', '$2')");
+    } else {
+        $self->run_github('repos->show()');
+    }
+}
+
+sub repo_list {
+    my ( $self, $args ) = @_;
+    if ( $args and $args =~ /^[\w\-]+$/ ) {
+        $self->run_github("repos->list('$args')");
+    } else {
+        $self->run_github('repos->list()');
     }
 }
 
