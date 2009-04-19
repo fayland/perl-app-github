@@ -43,6 +43,12 @@ has '_data' => ( is => 'rw', isa => 'HashRef', default => sub { {} } );
 =head1 DESCRIPTION
 
 a command line tool wrap L<Net::GitHub>
+
+=head1 ALPHA WARNING
+
+L<App::GitHub> is still in its infancy. lots of TODO
+
+feel free to fork from L<http://github.com/fayland/perl-app-github/tree/master>
  
 =head1 SEE ALSO
  
