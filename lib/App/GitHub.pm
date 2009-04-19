@@ -193,8 +193,8 @@ File/Path related
  cd       PATH              chdir to PATH
 
 Others
- show     :user :repo       more in-depth information for a repository
- list     :user             list out all the repositories for a user
+ rshow    :user :repo       more in-depth information for a repository
+ rlist    :user             list out all the repositories for a user
 HELP
 }
 
