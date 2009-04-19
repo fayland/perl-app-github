@@ -10,6 +10,8 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
+our $VERSION = '0.01';
+
 has 'term' => (
     is  => 'ro',
     isa => 'Object',
@@ -97,9 +99,9 @@ my $dispatch = {
 sub run {
     my $self = shift;
 
-    print <<'START';
+    print <<START;
 
-Welcome to GitHub Command Tools!
+Welcome to GitHub Command Tools! (Ver: $VERSION)
 Type '?' or 'h' for help.
 START
 
