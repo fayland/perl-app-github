@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 has 'term' => (
     is  => 'ro',
