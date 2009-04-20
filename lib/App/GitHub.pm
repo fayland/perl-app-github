@@ -108,7 +108,8 @@ my $dispatch = {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'view', $number ); 
     },
-    iopen    => \&issue_open,
+    iopen    => sub { shift->issue_open_or_edit( 'open' ) },
+    iedit    => sub { shift->issue_open_or_edit( 'edit', @_ ) },
     iclose   => sub {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'close', $number ); 
@@ -192,6 +193,7 @@ Issues
  iopen                      open a new issue (authentication required)
  iclose   :number           close an issue (authentication required)
  ireopen  :number           reopen an issue (authentication required)
+ iedit    :number           edit an issue (authentication required)
  ilabel   add|remove :num :label
                             add/remove a label (authentication required)
 
@@ -340,13 +342,27 @@ sub repo_del {
 }
 
 # Issues
-sub issue_open {
-    my ( $self ) = @_;
+sub issue_open_or_edit {
+    my ( $self, $type, $number ) = @_;
+    
+    if ( $type eq 'edit' and $number !~ /^\d+$/ ) {
+        $self->print('unknown argument. iedit :number');
+        return;
+    }
     
     my $title = $self->read( 'Title: ' );
-    my $body  = $self->read( 'Body: ' );
+    my $body  = $self->read( 'Body (use EOF to submit, use QUIT to cancel): ' );
+    while ( my $data = $self->read( '> ' ) ) {
+        last   if ( $data eq 'EOF');
+        return if ( $data eq 'QUIT' );
+        $body .= "\n" . $data;
+    }
     
-    $self->run_github( 'issue', 'open', $title, $body );
+    if ( $type eq 'edit' ) {
+        $self->run_github( 'issue', 'edit', $number, $title, $body );
+    } else {
+        $self->run_github( 'issue', 'open', $title, $body );
+    }
 }
 
 sub issue_label {
