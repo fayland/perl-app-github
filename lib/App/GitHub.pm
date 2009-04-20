@@ -84,38 +84,38 @@ my $dispatch = {
     rlist    => \&repo_list,
     findrepo => sub {
         my ( $self, $word ) = @_;
-        $self->run_github( "repos->search('$word')" );
+        $self->run_github( 'repos', 'search', $word );
     },
-    watch    => sub { shift->run_github( 'repos->watch()' ); },
-    unwatch  => sub { shift->run_github( 'repos->unwatch()' ); },
-    fork     => sub { shift->run_github( 'repos->fork()' ); },
+    watch    => sub { shift->run_github( 'repos', 'watch' ); },
+    unwatch  => sub { shift->run_github( 'repos', 'unwatch' ); },
+    fork     => sub { shift->run_github( 'repos', 'fork' ); },
     create   => \&repo_create,
     delete   => \&repo_delete,
-    set_private => sub { shift->run_github( 'repos->set_private()' ); },
-    set_public  => sub { shift->run_github( 'repos->set_public()' ); },
+    set_private => sub { shift->run_github( 'repos', 'set_private' ); },
+    set_public  => sub { shift->run_github( 'repos', 'set_public' ); },
     # XXX? TODO, deploy_keys collaborators
-    network     => sub { shift->run_github( 'repos->network()' ); },
-    tags        => sub { shift->run_github( 'repos->tags()' ); },
-    branches    => sub { shift->run_github( 'repos->branches()' ); },
+    network     => sub { shift->run_github( 'repos', 'network' ); },
+    tags        => sub { shift->run_github( 'repos', 'tags' ); },
+    branches    => sub { shift->run_github( 'repos', 'branches' ); },
     
     # Issues
     ilist    => sub {
         my ( $self, $type ) = @_;
         $type ||= 'open';
-        $self->run_github( "issue->list('$type')" );
+        $self->run_github( 'issue', 'list', $type );
     },
     iview    => sub {
         my ( $self, $number ) = @_;
-        $self->run_github( "issue->view($number)" ); 
+        $self->run_github( 'issue', 'view', $number ); 
     },
     iopen    => \&issue_open,
     iclose   => sub {
         my ( $self, $number ) = @_;
-        $self->run_github( "issue->close($number)" ); 
+        $self->run_github( 'issue', 'close', $number ); 
     },
     ireopen  => sub {
         my ( $self, $number ) = @_;
-        $self->run_github( "issue->reopen($number)" ); 
+        $self->run_github( 'issue', 'reopen', $number ); 
     },
     # XXX? TODO, add_label, edit etc
     ilabel   => \&issue_label,
@@ -270,7 +270,8 @@ sub _do_login {
 }
 
 sub run_github {
-    my ( $self, $command ) = @_;
+    my ( $self, $c1, $c2 ) = @_;
+    my @args = splice( @_, 3, scalar @_ - 3 );
     
     unless ( $self->github ) {
         $self->print(<<'ERR');
@@ -279,7 +280,11 @@ ERR
         return;
     }
     
-    eval(qq~\$self->print(JSON::XS->new->utf8->pretty->encode(\$self->github->$command))~);
+    eval {
+        $self->print(
+            JSON::XS->new->utf8->pretty->encode( $self->github->$c1->$c2(@args) )
+        );
+    };
     
     if ( $@ ) {
         # custom error
@@ -297,18 +302,18 @@ ERR
 sub repo_show {
     my ( $self, $args ) = @_;
     if ( $args and $args =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
-        $self->run_github("repos->show('$1', '$2')");
+        $self->run_github( 'repos', 'show', $1, $2 );
     } else {
-        $self->run_github('repos->show()');
+        $self->run_github( 'repos', 'show' );
     }
 }
 
 sub repo_list {
     my ( $self, $args ) = @_;
     if ( $args and $args =~ /^[\w\-]+$/ ) {
-        $self->run_github("repos->list('$args')");
+        $self->run_github( 'repos', 'list', $args );
     } else {
-        $self->run_github('repos->list()');
+        $self->run_github( 'repos', 'list' );
     }
 }
 
@@ -325,7 +330,7 @@ sub repo_create {
         return;
     }
     
-    $self->run_github( qq~repos->create( "$data{name}", "$data{desc}", "$data{homepage}", 1 )~ );
+    $self->run_github( 'repos', 'create', $data{name}, $data{desc}, $data{homepage}, 1 );
 }
 
 sub repo_del {
@@ -334,7 +339,7 @@ sub repo_del {
     my $data = $self->read( 'Are you sure to delete the repo? [YN]? ' );
     if ( $data eq 'Y' ) {
         $self->print("Deleting Repos ...");
-        $self->run_github( "repos->delete( { confirm => 1 } )" );
+        $self->run_github( 'repos', 'delete', { confirm => 1 } );
     }
 }
 
@@ -342,13 +347,10 @@ sub repo_del {
 sub issue_open {
     my ( $self ) = @_;
     
-    my %data;
-    foreach my $col ( 'title', 'body' ) {
-        my $data = $self->read( ucfirst($col) . ': ' );
-        $data{$col} = $data;
-    }
-
-    $self->run_github( qq~issue->open( "$data{title}", "$data{body}" )~ );
+    my $title = $self->read( 'Title: ' );
+    my $body  = $self->read( 'Body: ' );
+    
+    $self->run_github( 'issue', 'open', $title, $body );
 }
 
 sub issue_label {
@@ -357,9 +359,9 @@ sub issue_label {
     no warnings 'uninitialized';
     my ( $type, $number, $label ) = split(/\s+/, $args, 3);
     if ( $type eq 'add' ) {
-        $self->run_github( qq~issue->add_label( $number, '$label' )~ );
+        $self->run_github( 'issue', 'add_label', $number, $label );
     } elsif ( $type eq 'remove' ) {
-        $self->run_github( qq~issue->remove_label( $number, '$label' )~ );
+        $self->run_github( 'issue', 'remove_label', $number, $label );
     } else {
         $self->print('unknown argument. ilabel add|remove :number :label');
     }
