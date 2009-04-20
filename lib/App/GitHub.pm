@@ -77,6 +77,7 @@ my $dispatch = {
     # Common
     repo    => \&set_repo,
     login   => \&set_login,
+    loadcfg => \&set_loadcfg,
     
     # Repo
     rshow    => \&repo_show,
@@ -117,6 +118,8 @@ my $dispatch = {
         $self->run_github( "issue->reopen($number)" ); 
     },
     # XXX? TODO, add_label, edit etc
+    ilabel   => \&issue_label,
+    
     
     # File/Path
     cd      => sub {
@@ -164,6 +167,7 @@ sub help {
  command  argument          description
  repo     :user :repo       set owner/repo, eg: 'fayland perl-app-github'
  login    :login :token     authenticated as :login
+ loadcfg                    authed by git config --global github.user|token
  ?,h                        help
  q,exit,quit                exit
 
@@ -188,6 +192,8 @@ Issues
  iopen                      open a new issue (authentication required)
  iclose   :number           close an issue (authentication required)
  ireopen  :number           reopen an issue (authentication required)
+ ilabel   add|remove :num :label
+                            add/remove a label (authentication required)
 
 File/Path related
  cd       PATH              chdir to PATH
@@ -230,6 +236,26 @@ sub set_login {
         $self->print("Wrong login args ($login $token), eg fayland 54b5197d7f92f52abc5c7149b313cf51");
         return;
     }
+
+    $self->_do_login( $login, $token );
+}
+
+sub set_loadcfg {
+    my ( $self ) = @_;
+    
+    my $login = `git config --global github.user`;
+    my $token = `git config --global github.token`;
+    chomp($login); chomp($token);
+    unless ( $login and $token ) {
+        $self->print("run git config --global github.user|token fails");
+        return;
+    }
+    
+    $self->_do_login( $login, $token );
+}
+
+sub _do_login {
+    my ( $self, $login, $token ) = @_;
     
     # save for set_repo
     $self->{_data}->{login} = $login;
@@ -248,7 +274,7 @@ sub run_github {
     
     unless ( $self->github ) {
         $self->print(<<'ERR');
-unknown repo. try 'repo :owner/:repo' first
+unknown repo. try 'repo :owner :repo' first
 ERR
         return;
     }
@@ -295,9 +321,7 @@ sub repo_create {
         $data{$col} = $data;
     }
     unless ( length( $data{name} ) ) {
-        $self->print(<<'ERR');
-create repo failed. name is required
-ERR
+        $self->print('create repo failed. name is required');
         return;
     }
     
@@ -325,6 +349,20 @@ sub issue_open {
     }
 
     $self->run_github( qq~issue->open( "$data{title}", "$data{body}" )~ );
+}
+
+sub issue_label {
+    my ( $self, $args ) = @_;
+    
+    no warnings 'uninitialized';
+    my ( $type, $number, $label ) = split(/\s+/, $args, 3);
+    if ( $type eq 'add' ) {
+        $self->run_github( qq~issue->add_label( $number, '$label' )~ );
+    } elsif ( $type eq 'remove' ) {
+        $self->run_github( qq~issue->remove_label( $number, '$label' )~ );
+    } else {
+        $self->print('unknown argument. ilabel add|remove :number :label');
+    }
 }
 
 1;
