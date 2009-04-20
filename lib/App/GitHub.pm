@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 # Copied from Devel-REPL
 has 'term' => (
@@ -271,15 +271,13 @@ sub _do_login {
 
 sub run_github {
     my ( $self, $c1, $c2 ) = @_;
-    my @args = splice( @_, 3, scalar @_ - 3 );
     
     unless ( $self->github ) {
-        $self->print(<<'ERR');
-unknown repo. try 'repo :owner :repo' first
-ERR
+        $self->print(q~unknown repo. try 'repo :owner :repo' first~);
         return;
     }
     
+    my @args = splice( @_, 3, scalar @_ - 3 );
     eval {
         $self->print(
             JSON::XS->new->utf8->pretty->encode( $self->github->$c1->$c2(@args) )
@@ -289,9 +287,7 @@ ERR
     if ( $@ ) {
         # custom error
         if ( $@ =~ /login and token are required/ ) {
-            $self->print(<<'ERR');
-authentication required. try 'login :owner :token' first
-ERR
+            $self->print(qq~authentication required.\ntry 'login :owner :token' or 'loadcfg' first\n~);
         } else {
             $self->print($@);
         }
