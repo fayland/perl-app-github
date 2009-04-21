@@ -1,5 +1,9 @@
 Revision history for Perl extension App-GitHub
 
+0.08    2009.04.21
+        object/network related command
+        all API are done now
+
 0.07    2009.04.21
         commits related commad
         '| more' command
