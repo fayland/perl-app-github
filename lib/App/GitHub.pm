@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 # Copied from Devel-REPL
 has 'term' => (
@@ -27,12 +27,27 @@ has 'out_fh' => (
   default => sub { shift->term->OUT || \*STDOUT; }
 );
 
+has 'in_pager_mode' => ( is => 'rw', isa => 'Bool', default => 0 );
+
 sub print {
     my ($self, @ret) = @_;
     my $fh = $self->out_fh;
     no warnings 'uninitialized';
+    
+    my $pfh;
+    if ( $self->{in_pager_mode} ) {
+        open $pfh, '|-', 'more' or die "unable to 
++open ENV{PAGER}||less: $!";
+        $fh  = $pfh;
+    }
+    
     print $fh "@ret";
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
+    
+    if( $pfh ) {
+        close $pfh;
+        $self->{in_pager_mode} = 0;
+    }
 }
 sub read {
     my ($self, $prompt) = @_;
@@ -125,6 +140,9 @@ my $dispatch = {
     'u.pub_keys'  => sub { shift->user_pub_keys( 'show' ); },
     'u.pub_keys.add' => sub { shift->user_pub_keys( 'add', @_ ); },
     'u.pub_keys.del' => sub { shift->user_pub_keys( 'del', @_ ); },
+    
+    # Commits
+    'c.branch'  => sub { shift->run_github( 'commit', 'branch', shift ); },
 };
 
 sub run {
@@ -140,6 +158,8 @@ START
 
         $command =~ s/(^\s+|\s+$)//g;
         next unless length($command);
+        
+        $self->{in_pager_mode} = ( $command =~ s/\s+\|\s+more\s*$//  ) ? 1 : 0;
 
         # check dispatch
         if ( exists $dispatch->{$command} ) {
@@ -207,6 +227,12 @@ Users
  u.pub_keys                  Public Key Management (auth required)
  u.pub_keys.add
  u.pub_keys.del :number
+
+Commits
+ c.branch  :branch           list commits for a branch
+
+Pipeline:
+ more                        eg: 'c.branch | more'
 
 Others
  r.show    :user :repo       more in-depth information for a repository
@@ -436,5 +462,8 @@ sub user_pub_keys {
         $self->run_github( 'user', 'remove_pub_key', $number );
     }
 }
+
+#################### Commits;
+
 
 1;

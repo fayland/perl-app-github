@@ -1,5 +1,9 @@
 Revision history for Perl extension App-GitHub
 
+0.07    2009.04.21
+        commits related commad
+        '| more' command
+
 0.06    2009.04.21
         User related command
 
