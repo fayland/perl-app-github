@@ -80,54 +80,51 @@ my $dispatch = {
     loadcfg => \&set_loadcfg,
     
     # Repo
-    rshow    => \&repo_show,
-    rlist    => \&repo_list,
-    findrepo => sub {
+    'r.show'    => \&repo_show,
+    'r.list'    => \&repo_list,
+    'r.search' => sub {
         my ( $self, $word ) = @_;
         $self->run_github( 'repos', 'search', $word );
     },
-    watch    => sub { shift->run_github( 'repos', 'watch' ); },
-    unwatch  => sub { shift->run_github( 'repos', 'unwatch' ); },
-    fork     => sub { shift->run_github( 'repos', 'fork' ); },
-    create   => \&repo_create,
-    delete   => \&repo_delete,
-    set_private => sub { shift->run_github( 'repos', 'set_private' ); },
-    set_public  => sub { shift->run_github( 'repos', 'set_public' ); },
+    'r.watch'    => sub { shift->run_github( 'repos', 'watch' ); },
+    'r.unwatch'  => sub { shift->run_github( 'repos', 'unwatch' ); },
+    'r.fork'     => sub { shift->run_github( 'repos', 'fork' ); },
+    'r.create'   => \&repo_create,
+    'r.delete'   => \&repo_delete,
+    'r.set_private' => sub { shift->run_github( 'repos', 'set_private' ); },
+    'r.set_public'  => sub { shift->run_github( 'repos', 'set_public' ); },
     # XXX? TODO, deploy_keys collaborators
-    network     => sub { shift->run_github( 'repos', 'network' ); },
-    tags        => sub { shift->run_github( 'repos', 'tags' ); },
-    branches    => sub { shift->run_github( 'repos', 'branches' ); },
+    'r.network'     => sub { shift->run_github( 'repos', 'network' ); },
+    'r.tags'        => sub { shift->run_github( 'repos', 'tags' ); },
+    'r.branches'    => sub { shift->run_github( 'repos', 'branches' ); },
     
     # Issues
-    ilist    => sub {
+    'i.list'    => sub {
         my ( $self, $type ) = @_;
         $type ||= 'open';
         $self->run_github( 'issue', 'list', $type );
     },
-    iview    => sub {
+    'i.view'    => sub {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'view', $number ); 
     },
-    iopen    => sub { shift->issue_open_or_edit( 'open' ) },
-    iedit    => sub { shift->issue_open_or_edit( 'edit', @_ ) },
-    iclose   => sub {
+    'r.search' => sub {
+        my ( $self, $arg ) = @_;
+        my @args = split(/\s+/, $arg, 2);
+        $self->run_github( 'issue', 'search', @args );
+    },
+    'i.open'    => sub { shift->issue_open_or_edit( 'open' ) },
+    'i.edit'    => sub { shift->issue_open_or_edit( 'edit', @_ ) },
+    'i.close'   => sub {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'close', $number ); 
     },
-    ireopen  => sub {
+    'i.reopen'  => sub {
         my ( $self, $number ) = @_;
         $self->run_github( 'issue', 'reopen', $number ); 
     },
-    # XXX? TODO, add_label, edit etc
-    ilabel   => \&issue_label,
-    
-    
-    # File/Path
-    cd      => sub {
-        my ( $self, $args ) = @_;
-        eval("chdir $args");
-        $self->print($@) if $@;
-    },
+    'i.label'   => \&issue_label,
+    'i.comment' => \&issue_comment,
 };
 
 sub run {
@@ -165,44 +162,43 @@ START
 sub help {
     my $self = shift;
     $self->print(<<HELP);
- command  argument          description
- repo     :user :repo       set owner/repo, eg: 'fayland perl-app-github'
- login    :login :token     authenticated as :login
- loadcfg                    authed by git config --global github.user|token
- ?,h                        help
- q,exit,quit                exit
+ command   argument          description
+ repo      :user :repo       set owner/repo, eg: 'fayland perl-app-github'
+ login     :login :token     authenticated as :login
+ loadcfg                     authed by git config --global github.user|token
+ ?,h                         help
+ q,exit,quit                 exit
 
 Repos
- rshow                      more in-depth information for the :repo in repo
- rlist                      list out all the repositories for the :user in repo
- rsearch  WORD              Search Repositories
- watch                      watch repositories (authentication required)
- unwatch                    unwatch repositories (authentication required)
- fork                       fork a repository (authentication required)
- create                     create a new repository (authentication required)
- delete                     delete a repository (authentication required)
- set_private                set a public repo private (authentication required)
- set_public                 set a private repo public (authentication required)
- network                    see all the forks of the repo
- tags                       tags on the repo
- branches                   list of remote branches
+ r.show                      more in-depth information for the :repo
+ r.list                      list out all the repositories for the :user
+ r.search WORD               Search Repositories
+ r.watch                     watch repositories (auth required)
+ r.unwatch                   unwatch repositories (auth required)
+ r.fork                      fork a repository (auth required)
+ r.create                    create a new repository (auth required)
+ r.delete                    delete a repository (auth required)
+ r.set_private               set a public repo private (auth required)
+ r.set_public                set a private repo public (auth required)
+ r.network                   see all the forks of the repo
+ r.tags                      tags on the repo
+ r.branches                  list of remote branches
 
 Issues
- ilist    open|closed       see a list of issues for a project
- iview    :number           get data on an individual issue by number
- iopen                      open a new issue (authentication required)
- iclose   :number           close an issue (authentication required)
- ireopen  :number           reopen an issue (authentication required)
- iedit    :number           edit an issue (authentication required)
- ilabel   add|remove :num :label
-                            add/remove a label (authentication required)
-
-File/Path related
- cd       PATH              chdir to PATH
+ i.list    open|closed       see a list of issues for a project
+ i.view    :number           get data on an individual issue by number
+ i.search  open|closed WORD  Search Issues
+ i.open                      open a new issue (auth required)
+ i.close   :number           close an issue (auth required)
+ i.reopen  :number           reopen an issue (auth required)
+ i.edit    :number           edit an issue (auth required)
+ i.comment :number
+ i.label   add|remove :num :label
+                             add/remove a label (auth required)
 
 Others
- rshow    :user :repo       more in-depth information for a repository
- rlist    :user             list out all the repositories for a user
+ r.show    :user :repo       more in-depth information for a repository
+ r.list    :user             list out all the repositories for a user
 HELP
 }
 
@@ -211,7 +207,7 @@ sub set_repo {
     
     # validate
     unless ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
-        $self->print("Wrong repo args ($repo), eg fayland/perl-app-github");
+        $self->print("Wrong repo args ($repo), eg 'fayland perl-app-github'");
         return;
     }
     my ( $owner, $name ) = ( $repo =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ );
@@ -346,7 +342,7 @@ sub issue_open_or_edit {
     my ( $self, $type, $number ) = @_;
     
     if ( $type eq 'edit' and $number !~ /^\d+$/ ) {
-        $self->print('unknown argument. iedit :number');
+        $self->print('unknown argument. i.edit :number');
         return;
     }
     
@@ -375,8 +371,26 @@ sub issue_label {
     } elsif ( $type eq 'remove' ) {
         $self->run_github( 'issue', 'remove_label', $number, $label );
     } else {
-        $self->print('unknown argument. ilabel add|remove :number :label');
+        $self->print('unknown argument. i.label add|remove :number :label');
     }
+}
+
+sub issue_comment {
+    my ( $self, $number ) = @_;
+    
+    if ( $number !~ /^\d+$/ ) {
+        $self->print('unknown argument. i.comment :number');
+        return;
+    }
+    
+    my $body = $self->read( 'Comment (use EOF to submit, use QUIT to cancel): ' );
+    while ( my $data = $self->read( '> ' ) ) {
+        last   if ( $data eq 'EOF');
+        return if ( $data eq 'QUIT' );
+        $body .= "\n" . $data;
+    }
+    
+    $self->run_github( 'issue', 'comment', $number, $body );
 }
 
 1;
