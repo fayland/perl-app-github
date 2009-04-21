@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 has 'term' => (
     is => 'rw', required => 1,
@@ -172,7 +172,7 @@ my $dispatch = {
         $self->run_github( 'issue', 'list', $type );
     },
     'i.view'    => sub { shift->run_github( 'issue', 'view', shift ); },
-    'r.search' => sub {
+    'i.search'  => sub {
         my ( $self, $arg ) = @_;
         my @args = split(/\s+/, $arg, 2);
         $self->run_github( 'issue', 'search', @args );
