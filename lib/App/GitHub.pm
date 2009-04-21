@@ -10,7 +10,7 @@ use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 # Copied from Devel-REPL
 has 'term' => (
@@ -82,10 +82,7 @@ my $dispatch = {
     # Repo
     'r.show'    => \&repo_show,
     'r.list'    => \&repo_list,
-    'r.search' => sub {
-        my ( $self, $word ) = @_;
-        $self->run_github( 'repos', 'search', $word );
-    },
+    'r.search' => sub { shift->run_github( 'repos', 'search', shift ); },
     'r.watch'    => sub { shift->run_github( 'repos', 'watch' ); },
     'r.unwatch'  => sub { shift->run_github( 'repos', 'unwatch' ); },
     'r.fork'     => sub { shift->run_github( 'repos', 'fork' ); },
@@ -104,10 +101,7 @@ my $dispatch = {
         $type ||= 'open';
         $self->run_github( 'issue', 'list', $type );
     },
-    'i.view'    => sub {
-        my ( $self, $number ) = @_;
-        $self->run_github( 'issue', 'view', $number ); 
-    },
+    'i.view'    => sub { shift->run_github( 'issue', 'view', shift ); },
     'r.search' => sub {
         my ( $self, $arg ) = @_;
         my @args = split(/\s+/, $arg, 2);
@@ -115,16 +109,22 @@ my $dispatch = {
     },
     'i.open'    => sub { shift->issue_open_or_edit( 'open' ) },
     'i.edit'    => sub { shift->issue_open_or_edit( 'edit', @_ ) },
-    'i.close'   => sub {
-        my ( $self, $number ) = @_;
-        $self->run_github( 'issue', 'close', $number ); 
-    },
-    'i.reopen'  => sub {
-        my ( $self, $number ) = @_;
-        $self->run_github( 'issue', 'reopen', $number ); 
-    },
+    'i.close'   => sub { shift->run_github( 'issue', 'close', shift ); },
+    'i.reopen'  => sub { shift->run_github( 'issue', 'reopen', shift ); },
     'i.label'   => \&issue_label,
     'i.comment' => \&issue_comment,
+    
+    # User
+    'u.search' => sub { shift->run_github( 'user', 'search', shift ); },
+    'u.show'   => sub { shift->run_github( 'user', 'show', shift ); },
+    'u.update' => \&user_update,
+    'u.followers' => sub { shift->run_github( 'user', 'followers' ); },
+    'u.following' => sub { shift->run_github( 'user', 'following' ); },
+    'u.follow'    => sub { shift->run_github( 'user', 'follow', shift ); },
+    'u.unfollow'  => sub { shift->run_github( 'user', 'unfollow', shift ); },
+    'u.pub_keys'  => sub { shift->user_pub_keys( 'show' ); },
+    'u.pub_keys.add' => sub { shift->user_pub_keys( 'add', @_ ); },
+    'u.pub_keys.del' => sub { shift->user_pub_keys( 'del', @_ ); },
 };
 
 sub run {
@@ -193,12 +193,25 @@ Issues
  i.reopen  :number           reopen an issue (auth required)
  i.edit    :number           edit an issue (auth required)
  i.comment :number
- i.label   add|remove :num :label
+ i.label   add|del :num :label
                              add/remove a label (auth required)
+
+Users
+ u.search  WORD              search user
+ u.show                      get extended information on user
+ u.update                    update your users info (auth required)
+ u.followers
+ u.following
+ u.follow  :user             follow :user (auth required)
+ u.unfollow :user            unfollow :user (auth required)
+ u.pub_keys                  Public Key Management (auth required)
+ u.pub_keys.add
+ u.pub_keys.del :number
 
 Others
  r.show    :user :repo       more in-depth information for a repository
  r.list    :user             list out all the repositories for a user
+ u.show    :user             get extended information on :user
 HELP
 }
 
@@ -368,10 +381,10 @@ sub issue_label {
     my ( $type, $number, $label ) = split(/\s+/, $args, 3);
     if ( $type eq 'add' ) {
         $self->run_github( 'issue', 'add_label', $number, $label );
-    } elsif ( $type eq 'remove' ) {
+    } elsif ( $type eq 'del' ) {
         $self->run_github( 'issue', 'remove_label', $number, $label );
     } else {
-        $self->print('unknown argument. i.label add|remove :number :label');
+        $self->print('unknown argument. i.label add|del :number :label');
     }
 }
 
@@ -391,6 +404,37 @@ sub issue_comment {
     }
     
     $self->run_github( 'issue', 'comment', $number, $body );
+}
+
+################## Users
+sub user_update {
+    my ( $self, $type ) = @_;
+    
+    # name, email, blog, company, location
+    while ( ! ( $type and (grep { $_ eq $type } (qw/name email blog company location/)) ) ) {
+        $type = $self->read( 'Update Key: (name, email, blog, company, location): ' );
+    }
+    my $value = $self->read( 'Value: ' );
+    
+    $self->run_github( 'user', 'update', $type, $value );
+}
+
+sub user_pub_keys {
+    my ( $self, $type, $number ) = @_;
+    
+    if ( $type eq 'show' ) {
+        $self->run_github( 'user', 'pub_keys' );
+    } elsif ( $type eq 'add' ) {
+        my $name = $self->read( 'Pub Key Name: ' );
+        my $keyv = $self->read( 'Key: ' );
+        $self->run_github( 'user', 'add_pub_key', $name, $keyv );
+    } elsif ( $type eq 'del' ) {
+        unless ( $number and $number =~ /^\d+$/ ) {
+            $self->print('unknown argument. u.pub_keys.del :number');
+            return;
+        }
+        $self->run_github( 'user', 'remove_pub_key', $number );
+    }
 }
 
 1;
