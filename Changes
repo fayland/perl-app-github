@@ -1,5 +1,8 @@
 Revision history for Perl extension App-GitHub
 
+0.09    2009.04.21
+        bug fix for o.raw
+
 0.08    2009.04.21
         object/network related command
         all API are done now
