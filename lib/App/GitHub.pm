@@ -12,42 +12,30 @@ use JSON::XS;
 
 our $VERSION = '0.07';
 
-# Copied from Devel-REPL
 has 'term' => (
-  is => 'rw', required => 1,
-  default => sub { Term::ReadLine->new('Perl-App-GitHub') }
+    is => 'rw', required => 1,
+    default => sub { Term::ReadLine->new('Perl-App-GitHub') }
 );
 has 'prompt' => (
-  is => 'rw', required => 1,
-  default => sub { 'github> ' }
+    is => 'rw', required => 1,
+    default => sub { 'github> ' }
 );
 
 has 'out_fh' => (
-  is => 'rw', required => 1, lazy => 1,
-  default => sub { shift->term->OUT || \*STDOUT; }
+    is => 'rw', required => 1, lazy => 1,
+    default => sub {
+        shift->term->OUT || \*STDOUT;
+    }
 );
-
-has 'in_pager_mode' => ( is => 'rw', isa => 'Bool', default => 0 );
 
 sub print {
     my ($self, @ret) = @_;
-    my $fh = $self->out_fh;
+    #my $fh = $self->out_fh;
+    open my $fh, '|-', 'more' or die "unable to open more: $!";
     no warnings 'uninitialized';
-    
-    my $pfh;
-    if ( $self->{in_pager_mode} ) {
-        open $pfh, '|-', 'more' or die "unable to 
-+open ENV{PAGER}||less: $!";
-        $fh  = $pfh;
-    }
-    
     print $fh "@ret";
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
-    
-    if( $pfh ) {
-        close $pfh;
-        $self->{in_pager_mode} = 0;
-    }
+    close($fh);
 }
 sub read {
     my ($self, $prompt) = @_;
@@ -143,6 +131,14 @@ my $dispatch = {
     
     # Commits
     'c.branch'  => sub { shift->run_github( 'commit', 'branch', shift ); },
+    'c.file'    => sub {
+        my ( $self, $arg ) = @_;
+        my @args = split(/\s+/, $arg, 2);
+        @args = ('master', $args[0]) if scalar @args == 1;
+        $self->run_github( 'commit', 'file', @args );
+    },
+    'c.show'    => sub { shift->run_github( 'commit', 'show', shift ); },
+    
 };
 
 sub run {
@@ -158,8 +154,6 @@ START
 
         $command =~ s/(^\s+|\s+$)//g;
         next unless length($command);
-        
-        $self->{in_pager_mode} = ( $command =~ s/\s+\|\s+more\s*$//  ) ? 1 : 0;
 
         # check dispatch
         if ( exists $dispatch->{$command} ) {
@@ -230,9 +224,9 @@ Users
 
 Commits
  c.branch  :branch           list commits for a branch
-
-Pipeline:
- more                        eg: 'c.branch | more'
+ c.file    :branch :file     get all the commits modified the file
+ c.file    :file             (default branch 'master')
+ c.show    :sha1             show a specific commit
 
 Others
  r.show    :user :repo       more in-depth information for a repository
