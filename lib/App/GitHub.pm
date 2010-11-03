@@ -9,6 +9,7 @@ use Moose;
 use Net::GitHub;
 use Term::ReadLine;
 use JSON::XS;
+use IPC::Cmd qw/can_run/;
 
 our $VERSION = '0.10';
 
@@ -33,7 +34,11 @@ sub print {
 
     my $fh; local $@;
     eval {
-        open $fh, '|-', 'more' or die "unable to open more: $!";
+        # let less exit if one screen
+        no warnings 'uninitialized';
+        local $ENV{LESS} ||= "";
+        $ENV{LESS} .= " -F";
+        open $fh, '|-', $self->_get_pager or die "unable to open more: $!";
     };
     $fh = $self->out_fh if $@;
     
@@ -42,6 +47,12 @@ sub print {
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
     close($fh);
 }
+
+sub _get_pager {
+    my $pager = $ENV{PAGER} || can_run("less") || can_run("more")
+        || die "no pager found";
+}
+
 sub read {
     my ($self, $prompt) = @_;
     $prompt ||= $self->prompt;
