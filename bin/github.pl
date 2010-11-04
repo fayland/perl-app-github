@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+# ABSTRACT: GitHub Command Tools
+
 use strict;
 use warnings;
 
