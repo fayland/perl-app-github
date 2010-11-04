@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+package  # hidden from PAUSE
+  github;
+
 # ABSTRACT: GitHub Command Tools
 
 use strict;
