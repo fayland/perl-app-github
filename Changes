@@ -1,5 +1,8 @@
 Revision history for Perl extension App-GitHub
 
+0.11    2010.11.06
+        use LoadTests instead of CompileTests (because CompileTests returns 'skipped: no tests to run')
+
 0.10    2010.11.04
         typo fix
         Less is more (datamuc)
