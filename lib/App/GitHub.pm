@@ -396,6 +396,13 @@ sub _do_login {
             owner => $self->{_data}->{owner}, repo  => $self->{_data}->{repo},
             login => $self->{_data}->{login}, token => $self->{_data}->{token}
         );
+    } else {
+        # Create a Net::GitHub object with the owner set to the logged in user
+        # Super convenient if you don't want to set a user first
+        $self->{github} = Net::GitHub->new(
+            login => $self->{_data}->{login}, token => $self->{_data}->{token},
+            owner => $self->{_data}->{login}
+        );
     }
 }
 
@@ -403,7 +410,7 @@ sub run_github {
     my ( $self, $c1, $c2 ) = @_;
     
     unless ( $self->github ) {
-        $self->print(q~unknown repo. try 'repo :owner :repo' first~);
+        $self->print(q~not enough information. try calling login :user :token or repo :owner :repo first~);
         return;
     }
     
