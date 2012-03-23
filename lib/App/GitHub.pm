@@ -391,7 +391,7 @@ sub _do_login {
     $self->{_data}->{login} = $login;
     $self->{_data}->{token} = $token;
 
-    if ( $self->github ) {
+    if ( $self->{_data}->{repo} ) {
         $self->{github} = Net::GitHub->new(
             owner => $self->{_data}->{owner}, repo  => $self->{_data}->{repo},
             login => $self->{_data}->{login}, token => $self->{_data}->{token}
@@ -410,7 +410,7 @@ sub run_github {
     my ( $self, $c1, $c2 ) = @_;
     
     unless ( $self->github ) {
-        $self->print(q~not enough information. try calling login :user :token or repo :owner :repo first~);
+        $self->print(q~not enough information. try calling login :user :token or loadcfg~);
         return;
     }
     
@@ -434,13 +434,24 @@ sub run_github {
     }
 }
 
+sub run_github_with_repo {
+    my ( $self ) = shift;
+
+    unless ( $self->{_data}->{repo} ) {
+        $self->print(q~no repo specified. try calling repo :owner :repo~);
+        return;
+    }
+
+    $self->run_github( @_ );
+}
+
 ################## Repos
 sub repo_show {
     my ( $self, $args ) = @_;
     if ( $args and $args =~ /^([\-\w]+)[\/\\\s]([\-\w]+)$/ ) {
         $self->run_github( 'repos', 'show', $1, $2 );
     } else {
-        $self->run_github( 'repos', 'show' );
+        $self->run_github_with_repo( 'repos', 'show' );
     }
 }
 
@@ -475,7 +486,7 @@ sub repo_del {
     my $data = $self->read( 'Are you sure to delete the repo? [YN]? ' );
     if ( $data eq 'Y' ) {
         $self->print("Deleting Repos ...");
-        $self->run_github( 'repos', 'delete', { confirm => 1 } );
+        $self->run_github_with_repo( 'repos', 'delete', { confirm => 1 } );
     }
 }
 
@@ -497,9 +508,9 @@ sub issue_open_or_edit {
     }
     
     if ( $type eq 'edit' ) {
-        $self->run_github( 'issue', 'edit', $number, $title, $body );
+        $self->run_github_with_repo( 'issue', 'edit', $number, $title, $body );
     } else {
-        $self->run_github( 'issue', 'open', $title, $body );
+        $self->run_github_with_repo( 'issue', 'open', $title, $body );
     }
 }
 
@@ -509,9 +520,9 @@ sub issue_label {
     no warnings 'uninitialized';
     my ( $type, $number, $label ) = split(/\s+/, $args, 3);
     if ( $type eq 'add' ) {
-        $self->run_github( 'issue', 'add_label', $number, $label );
+        $self->run_github_with_repo( 'issue', 'add_label', $number, $label );
     } elsif ( $type eq 'del' ) {
-        $self->run_github( 'issue', 'remove_label', $number, $label );
+        $self->run_github_with_repo( 'issue', 'remove_label', $number, $label );
     } else {
         $self->print('unknown argument. i.label add|del :number :label');
     }
@@ -532,7 +543,7 @@ sub issue_comment {
         $body .= "\n" . $data;
     }
     
-    $self->run_github( 'issue', 'comment', $number, $body );
+    $self->run_github_with_repo( 'issue', 'comment', $number, $body );
 }
 
 ################## Users
