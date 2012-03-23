@@ -7,6 +7,7 @@ use warnings;
 
 use Moose;
 use Net::GitHub;
+use Term::ReadKey;
 use Term::ReadLine;
 use JSON::XS;
 use IPC::Cmd qw/can_run/;
@@ -30,22 +31,31 @@ has 'out_fh' => (
 );
 
 sub print {
-    my ($self, @ret) = @_;
+    my ($self, $message) = @_;
 
     my $fh; local $@;
-    eval {
-        # let less exit if one screen
-        no warnings 'uninitialized';
-        local $ENV{LESS} ||= "";
-        $ENV{LESS} .= " -F";
-        open $fh, '|-', $self->_get_pager or die "unable to open more: $!";
-    };
-    $fh = $self->out_fh if $@;
+    my $rows = (GetTerminalSize($self->out_fh))[1];
+    my $message_rows = $message =~ tr/\n/\n/;
+    my $pager_use = 0;
+
+    # let less exit if one screen
+    no warnings 'uninitialized';
+    local $ENV{LESS} ||= "";
+    $ENV{LESS} .= " -F";
+    use warnings;
+
+    if ($@ or $message_rows < $rows) {
+        $fh = $self->out_fh;
+    } else {
+        eval { open $fh, '|-', $self->_get_pager or die "unable to open more: $!" }
+            or $fh = $self->out_fh;
+        $pager_use = 1;
+    }
     
     no warnings 'uninitialized';
-    print $fh "@ret";
+    print $fh "$message";
     print $fh "\n" if $self->term->ReadLine =~ /Gnu/;
-    close($fh);
+    close($fh) if $pager_use;
 }
 
 sub _get_pager {
@@ -235,7 +245,6 @@ sub run {
     my $self = shift;
 
     $self->print(<<START);
-
 Welcome to GitHub Command Tools! (Ver: $VERSION)
 Type '?' or 'h' for help.
 START
