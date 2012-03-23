@@ -240,6 +240,7 @@ Welcome to GitHub Command Tools! (Ver: $VERSION)
 Type '?' or 'h' for help.
 START
 
+    $self->set_loadcfg(1);
     while ( defined (my $command = $self->read) ) {
 
         $command =~ s/(^\s+|\s+$)//g;
@@ -371,17 +372,17 @@ sub set_login {
 }
 
 sub set_loadcfg {
-    my ( $self ) = @_;
+    my ( $self, $ign ) = @_;
     
     my $login = `git config --global github.user`;
     my $token = `git config --global github.token`;
     chomp($login); chomp($token);
-    unless ( $login and $token ) {
+    unless ( ($login and $token) or $ign ) {
         $self->print("run git config --global github.user|token fails");
         return;
     }
     
-    $self->_do_login( $login, $token );
+    $self->_do_login( $login, $token ) if $login and $token;
 }
 
 sub _do_login {
